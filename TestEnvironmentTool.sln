@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestEnvironmentTool", "TestEnvironmentTool\TestEnvironmentTool.csproj", "{FD6B5726-92C8-4693-91DE-8B58EF0127A6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FD6B5726-92C8-4693-91DE-8B58EF0127A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD6B5726-92C8-4693-91DE-8B58EF0127A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FD6B5726-92C8-4693-91DE-8B58EF0127A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FD6B5726-92C8-4693-91DE-8B58EF0127A6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
