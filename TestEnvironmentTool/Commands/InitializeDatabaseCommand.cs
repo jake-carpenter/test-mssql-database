@@ -7,17 +7,17 @@ namespace TestEnvironmentTool.Commands
     [Verb("init", HelpText = "Initialize database container.")]
     public class InitializeDatabaseCommand : BaseCommand
     {
-        public Task<int> Execute(DatabaseContainerFactory databaseContainerFactory)
+        public async Task<int> Execute(DatabaseContainerFactory databaseContainerFactory)
         {
-            var result = TryExecute(
-                () =>
+            var result = await TryExecuteAsync(
+                async () =>
                 {
-                    var container = databaseContainerFactory.GetContainer();
+                    _ = databaseContainerFactory.GetContainer();
 
-                    databaseContainerFactory.WaitForHealthyDatabase(container);
+                    await databaseContainerFactory.DatabaseHealthCheck();
                 });
 
-            return Task.FromResult(result);
+            return result;
         }
     }
 }

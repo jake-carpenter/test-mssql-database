@@ -1,7 +1,10 @@
-﻿using Ductus.FluentDocker;
+﻿using System;
+using System.Threading.Tasks;
+using Dapper;
+using Ductus.FluentDocker;
 using Ductus.FluentDocker.Builders;
 using Ductus.FluentDocker.Services;
-using Ductus.FluentDocker.Services.Extensions;
+using Microsoft.Data.SqlClient;
 using Spectre.Console;
 
 namespace TestEnvironmentTool.Infrastructure
@@ -45,12 +48,35 @@ namespace TestEnvironmentTool.Infrastructure
             return container;
         }
 
-        public void WaitForHealthyDatabase(IContainerService container)
+        public async Task DatabaseHealthCheck()
         {
             var timeoutInSeconds = _settings.InitializeDatabaseSettings.HealthCheckTimeoutInSeconds;
+            var port = _settings.InitializeDatabaseSettings.Port;
+            var password = _settings.InitializeDatabaseSettings.DatabasePassword;
+            var connectionString =
+                $"Data Source=localhost,{port};User Id=sa;Password={password};TrustServerCertificate=true;";
+
             AnsiConsole.MarkupLine($"[grey]Waiting for database to be up (up to {timeoutInSeconds}sec)...[/]");
-            container.WaitForMessageInLogs("The tempdb database has", timeoutInSeconds * 1000);
-            AnsiConsole.MarkupLine($"[green]Waiting for database to be up (up to {timeoutInSeconds}sec)...done[/]");
+
+            var timeLimit = DateTime.Now.AddSeconds(timeoutInSeconds);
+            var connection = new SqlConnection(connectionString);
+
+            while (timeLimit > DateTime.Now)
+            {
+                try
+                {
+                    await connection.ExecuteAsync("SELECT 1");
+                    AnsiConsole.MarkupLine(
+                        $"[green]Waiting for database to be up (up to {timeoutInSeconds}sec)...done[/]");
+                    return;
+                }
+                catch
+                {
+                    await Task.Delay(3000);
+                }
+            }
+
+            throw new Exception("Database connection timeout exceeded.");
         }
 
         public void DestroyContainer()

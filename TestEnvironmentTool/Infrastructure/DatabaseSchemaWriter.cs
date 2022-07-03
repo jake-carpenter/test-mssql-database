@@ -28,25 +28,34 @@ namespace TestEnvironmentTool.Infrastructure
 
         public async Task LoadFullSchema(DirectoryInfo workingPath)
         {
-            var createDatabaseTask = CreateDatabases();
-            var readSqlTask = ReadSql(workingPath);
-            var migrationProjects = GetFullMigrationPaths(workingPath).ToArray();
-            var buildTask = BuildMigrations(migrationProjects);
+            try
+            {
+                var createDatabaseTask = CreateDatabases();
+                var readSqlTask = ReadSql(workingPath);
+                var migrationProjects = GetFullMigrationPaths(workingPath).ToArray();
+                var buildTask = BuildMigrations(migrationProjects, workingPath);
 
-            await Task.WhenAll(createDatabaseTask, readSqlTask, buildTask);
+                await Task.WhenAll(createDatabaseTask, readSqlTask, buildTask);
 
-            var loadSqlTask = LoadSchemasFromSql(readSqlTask.Result);
-            await buildTask;
-            var runMigrationsTask = RunMigrations(migrationProjects);
+                var loadSqlTask = LoadSchemasFromSql(readSqlTask.Result);
+                await buildTask;
+                var runMigrationsTask = RunMigrations(migrationProjects, workingPath);
 
-            await Task.WhenAll(loadSqlTask, runMigrationsTask);
+                await Task.WhenAll(loadSqlTask, runMigrationsTask);
+                CleanupTemporaryFolders(workingPath);
+            }
+            catch
+            {
+                CleanupTemporaryFolders(workingPath);
+                throw;
+            }
         }
 
         public async Task CreateDatabases()
         {
             const string createSql = "CREATE DATABASE";
 
-            AnsiConsole.MarkupLine($"[grey]Creating databases...[/]");
+            AnsiConsole.MarkupLine("[grey]Creating databases...[/]");
 
             var stringBuilder = new StringBuilder();
             foreach (var dbName in _settings.DatabasesToCreate)
@@ -68,6 +77,8 @@ namespace TestEnvironmentTool.Infrastructure
                 throw new Exception($"Invalid directory for SQL files: {sqlDirectory.FullName}");
 
             var databaseStatements = new Dictionary<string, List<string>>();
+            if (_settings.SqlFilesToExecute is null)
+                return databaseStatements;
 
             var statementsToSkip = new[] { "SET ANSI_PADDING ON", "SET ANSI_NULLS ON", "SET QUOTED_IDENTIFIER ON" };
             foreach (var (database, sqlFiles) in _settings.SqlFilesToExecute)
@@ -115,14 +126,15 @@ namespace TestEnvironmentTool.Infrastructure
             await Task.WhenAll(tasks);
         }
 
-        public Task BuildMigrations(IEnumerable<MigrationProject> migrationProjects)
+        public Task BuildMigrations(IEnumerable<MigrationProject> migrationProjects, DirectoryInfo workingDirectory)
         {
             async void ExecuteBuildCommand(MigrationProject project)
             {
                 AnsiConsole.MarkupLine($"[grey]Building {project.Database} migrations...[/]");
 
+                var tempDir = Path.Combine(workingDirectory.FullName, $"./tmp_{project.Database}");
                 await Cli.Wrap("dotnet")
-                    .WithArguments($"build {project.FullPath} -c Release")
+                    .WithArguments($"build {project.FullPath} -c Release -o {tempDir}")
                     .WithStandardErrorPipe(PipeTarget.ToDelegate(err => AnsiConsole.MarkupLine($"[red]{err}[/]")))
                     .ExecuteAsync();
 
@@ -134,25 +146,26 @@ namespace TestEnvironmentTool.Infrastructure
             return Task.CompletedTask;
         }
 
-        public Task RunMigrations(IEnumerable<MigrationProject> migrationProjects)
+        public async Task RunMigrations(IEnumerable<MigrationProject> migrationProjects, DirectoryInfo workingDirectory)
         {
-            async void ExecuteRunCommand(MigrationProject project)
+            async Task ExecuteRunCommand(MigrationProject project)
             {
                 var connectionString = $"{_connectionStringBase};Database={project.Database}";
-                AnsiConsole.MarkupLine($"[grey]Running {project.Database} migrations...[/]");
+                var tempDir = Path.Combine(workingDirectory.FullName, $"./tmp_{project.Database}");
+                AnsiConsole.MarkupLine($"[grey]Executing {project.Database} migrations[/]");
 
                 await Cli.Wrap("dotnet")
-                    .WithArguments(
-                        $"run -c Release --no-build --project {project.FullPath} --connection \"{connectionString}\"")
-                    .WithStandardErrorPipe(PipeTarget.ToDelegate(err => AnsiConsole.MarkupLine($"[red]{err}[/]")))
+                    .WithArguments($"{tempDir}/{project.Database}.Migrations.dll \"{connectionString}\"")
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(Console.WriteLine))
                     .ExecuteAsync();
 
-                AnsiConsole.MarkupLine($"[green]Running {project.Database} migrations...done[/]");
+                AnsiConsole.MarkupLine($"[green]Executing {project.Database} migrations...done[/]");
             }
 
-            Parallel.ForEach(migrationProjects, ExecuteRunCommand);
-
-            return Task.CompletedTask;
+            foreach (var migrationProject in migrationProjects)
+            {
+                await ExecuteRunCommand(migrationProject);
+            }
         }
 
         public IEnumerable<MigrationProject> GetFullMigrationPaths(DirectoryInfo workingDirectory)
@@ -167,6 +180,17 @@ namespace TestEnvironmentTool.Infrastructure
                     throw new Exception($"Invalid migration project file: {file.FullName}");
 
                 yield return new MigrationProject(database, file.FullName);
+            }
+        }
+
+        public void CleanupTemporaryFolders(DirectoryInfo workingDirectory)
+        {
+            foreach (var dir in workingDirectory.GetDirectories())
+            {
+                if (dir.Name.Contains("tmp_"))
+                {
+                    dir.Delete(true);
+                }
             }
         }
     }
