@@ -48,11 +48,11 @@ namespace TestEnvironmentTool.Commands
                 }
 
                 var databaseContainerTask = Task.Run(
-                    () =>
+                    async () =>
                     {
                         databaseContainerFactory.DestroyContainer();
                         var container = databaseContainerFactory.GetContainer();
-                        databaseContainerFactory.WaitForHealthyDatabase(container);
+                        await databaseContainerFactory.DatabaseHealthCheck();
 
                         return container;
                     });
@@ -60,7 +60,7 @@ namespace TestEnvironmentTool.Commands
                 startupTasks.Add(databaseContainerTask);
 
                 var migrationProjects = databaseSchemaWriter.GetFullMigrationPaths(workingDirectory).ToArray();
-                startupTasks.Add(databaseSchemaWriter.BuildMigrations(migrationProjects));
+                startupTasks.Add(databaseSchemaWriter.BuildMigrations(migrationProjects, workingDirectory));
 
                 await Task.WhenAll(startupTasks);
 
@@ -68,7 +68,7 @@ namespace TestEnvironmentTool.Commands
                 await databaseSchemaWriter.CreateDatabases();
 
                 var executeSqlTask = databaseSchemaWriter.LoadSchemasFromSql(sqlStatements);
-                var runMigrationsTask = databaseSchemaWriter.RunMigrations(migrationProjects);
+                var runMigrationsTask = databaseSchemaWriter.RunMigrations(migrationProjects, workingDirectory);
 
                 await Task.WhenAll(executeSqlTask, runMigrationsTask);
             }

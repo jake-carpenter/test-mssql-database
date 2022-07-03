@@ -47,7 +47,7 @@ namespace TestEnvironmentTool.Infrastructure
                 .DefineImage(_settings.CustomPythonImageName)
                 .ReuseIfAlreadyExists()
                 .From(_settings.PythonImageTag)
-                .Run("echo 'deb http://ftp.us.debian.org/debian/ jessie main' >>/etc/apt/sources.list")
+                .Run("echo 'deb http://ftp.us.debian.org/debian/ jessie main' >> /etc/apt/sources.list")
                 .Run("apt-get update --allow-insecure-repositories")
                 .Run("apt-get install --allow-unauthenticated -y libicu63 libssl1.0.0 libffi-dev libunwind8")
                 .Run("pip install --upgrade pip")
