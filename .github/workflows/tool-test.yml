@@ -1,0 +1,26 @@
+name: .NET
+
+on:
+  push:
+    branches: [ "tool-test" ]
+  pull_request:
+    branches: [ "tool-test" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: 5.0.x
+    - name: Restore dependencies
+      run: dotnet restore --nologo
+    - name: Build
+      run: dotnet build -c Release --no-restore --noloog
+    - name: Pack
+      run: dotnet pack -c Release --no-build --nologo /p:Version=0.0.1-pre-$GITHUB_RUN_NUMBER  
+
