@@ -20,7 +20,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore --nologo
     - name: Build
-      run: dotnet build -c Release --no-restore --noloog
+      run: dotnet build -c Release --no-restore --nologo
     - name: Pack
       run: dotnet pack -c Release --no-build --nologo /p:Version=0.0.1-pre-$GITHUB_RUN_NUMBER  
 
